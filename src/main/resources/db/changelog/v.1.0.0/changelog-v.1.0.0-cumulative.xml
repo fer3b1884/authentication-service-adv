@@ -10,6 +10,7 @@
 
     <include file="2026-10-21-create-user-credentials.xml" relativeToChangelogFile="true"/>
     <include file="2026-10-21-create-refresh-tokens.xml" relativeToChangelogFile="true"/>
-    <include file="2026-10-10-change-data-type.xml" relativeToChangelogFile="true"/>
+    <include file="2026-10-22-change-data-type.xml" relativeToChangelogFile="true"/>
+    <include file="2026-10-23-change-timestamp-type.xml" relativeToChangelogFile="true"/>
 
 </databaseChangeLog>
