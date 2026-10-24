@@ -8,9 +8,11 @@ import by.shved.authenticationserviceadv.repository.UserCredentialsRepository;
 import by.shved.authenticationserviceadv.service.UserCredentialsService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class UserCredentialsServiceImpl implements UserCredentialsService {
@@ -21,6 +23,7 @@ public class UserCredentialsServiceImpl implements UserCredentialsService {
     @Transactional
     public void saveCredentials(UserCredentialsRequest request) {
         if (userCredentialsRepository.existsByLogin(request.login())) {
+            log.warn("Failed to save credentials: login already exists");
             throw new DuplicateResourceException("Login is already taken");
         }
         UserCredentialsEntity credentials = new UserCredentialsEntity();
@@ -28,6 +31,7 @@ public class UserCredentialsServiceImpl implements UserCredentialsService {
         credentials.setLogin(request.login());
         credentials.setPasswordHash(passwordEncoder.encode(request.password()));
         credentials.setRole(UserRole.USER);
+        log.info("User credentials created successfully: userId={}", request.userId());
         userCredentialsRepository.save(credentials);
     }
 }

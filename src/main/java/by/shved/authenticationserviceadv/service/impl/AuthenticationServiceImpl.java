@@ -14,6 +14,7 @@ import by.shved.authenticationserviceadv.service.AuthenticationService;
 import by.shved.authenticationserviceadv.service.jwt.JwtService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -22,6 +23,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthenticationServiceImpl implements AuthenticationService {
@@ -40,8 +42,12 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     public TokenResponse login(LoginRequest request) {
         UserCredentialsEntity credentials = userCredentialsRepository
                 .findByLogin(request.login())
-                .orElseThrow(() -> new BadCredentialsException("Invalid login or password"));
+                .orElseThrow(() -> {
+                    log.warn("Authentication failed: invalid credentials");
+                    return new BadCredentialsException("Invalid login or password");
+                });
         if (!passwordEncoder.matches(request.password(), credentials.getPasswordHash())) {
+            log.warn("Authentication failed: invalid credentials");
             throw new BadCredentialsException("Invalid login or password");
         }
 
@@ -63,6 +69,8 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         refreshTokenEntity.setExpiresAt(LocalDateTime.now().plusSeconds(refreshTokenExpiration / 1000));
         refreshTokenRepository.save(refreshTokenEntity);
 
+        log.info("User authenticated successfully: userId={}, role={}",
+                credentials.getUserId(), credentials.getRole());
         return new TokenResponse(
                 accessToken,
                 refreshToken,
@@ -76,22 +84,31 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     public TokenResponse refresh(RefreshTokenRequest request) {
         String oldToken = request.refreshToken();
         if (!jwtService.isTokenValid(oldToken, TokenType.REFRESH)) {
-            throw new InvalidTokenException("Invalid refresh token");
+            log.warn("Token refresh failed: invalid refresh token");
+            throw new InvalidTokenException("Invalid or expired refresh token");
         }
+
         UUID oldTokenId = jwtService.extractTokenId(oldToken);
         Long userId = jwtService.extractUserId(oldToken);
         RefreshTokenEntity storedToken = refreshTokenRepository
                 .findByTokenId(oldTokenId)
-                .orElseThrow(() -> new InvalidTokenException("Invalid refresh token"));
+                .orElseThrow(() -> {
+                    log.warn("Token refresh failed: refresh token not found");
+                    return new InvalidTokenException("Invalid or expired refresh token");
+                });
         if (storedToken.isRevoked()
                 || !storedToken.getUserId().equals(userId)
                 || !storedToken.getExpiresAt().isAfter(LocalDateTime.now())
         ) {
-            throw new InvalidTokenException("Invalid refresh token");
+            log.warn("Token refresh failed: revoked, expired, or user ID mismatch");
+            throw new InvalidTokenException("Invalid or expired refresh token");
         }
         UserCredentialsEntity credentials = userCredentialsRepository
                 .findByUserId(userId)
-                .orElseThrow(() -> new InvalidTokenException("Invalid refresh token"));
+                .orElseThrow(() -> {
+                    log.warn("Token refresh failed: credentials not found for userId={}", userId);
+                    return new InvalidTokenException("Invalid or expired refresh token");
+                });
 
         UUID newTokenId = UUID.randomUUID();
         String accessToken = jwtService.generateAccessToken(
@@ -113,6 +130,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         newStoredToken.setExpiresAt(LocalDateTime.now().plusSeconds(refreshTokenExpiration / 1000));
         refreshTokenRepository.save(newStoredToken);
 
+        log.info("Tokens refreshed successfully: userId={}", userId);
         return new TokenResponse(
                 accessToken,
                 refreshToken,
@@ -124,10 +142,12 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     @Override
     public TokenValidationResponse validateToken(String token) {
         if (!jwtService.isTokenValid(token, TokenType.ACCESS)) {
+            log.debug("Access token validation failed");
             return new TokenValidationResponse(false, null, null);
         }
         Long userId = jwtService.extractUserId(token);
         String role = jwtService.extractRole(token).name();
+        log.info("Access token validated successfully: userId={}, role={}", userId, role);
         return new TokenValidationResponse(true, userId, role);
     }
 }
