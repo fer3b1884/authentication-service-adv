@@ -3,6 +3,7 @@ package by.shved.authenticationserviceadv.service.impl;
 import by.shved.authenticationserviceadv.dto.credentials.UserCredentialsRequest;
 import by.shved.authenticationserviceadv.entity.UserCredentialsEntity;
 import by.shved.authenticationserviceadv.entity.UserRole;
+import by.shved.authenticationserviceadv.exception.DuplicateResourceException;
 import by.shved.authenticationserviceadv.repository.UserCredentialsRepository;
 import by.shved.authenticationserviceadv.service.UserCredentialsService;
 import jakarta.transaction.Transactional;
@@ -20,7 +21,7 @@ public class UserCredentialsServiceImpl implements UserCredentialsService {
     @Transactional
     public void saveCredentials(UserCredentialsRequest request) {
         if (userCredentialsRepository.existsByLogin(request.login())) {
-            throw new IllegalArgumentException("Login is already taken");
+            throw new DuplicateResourceException("Login is already taken");
         }
         UserCredentialsEntity credentials = new UserCredentialsEntity();
         credentials.setUserId(request.userId());

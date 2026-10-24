@@ -7,6 +7,7 @@ import by.shved.authenticationserviceadv.dto.token.TokenValidationResponse;
 import by.shved.authenticationserviceadv.entity.RefreshTokenEntity;
 import by.shved.authenticationserviceadv.entity.TokenType;
 import by.shved.authenticationserviceadv.entity.UserCredentialsEntity;
+import by.shved.authenticationserviceadv.exception.InvalidTokenException;
 import by.shved.authenticationserviceadv.repository.RefreshTokenRepository;
 import by.shved.authenticationserviceadv.repository.UserCredentialsRepository;
 import by.shved.authenticationserviceadv.service.AuthenticationService;
@@ -16,12 +17,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
 import java.util.UUID;
-import java.time.Instant;
 
+@Service
 @RequiredArgsConstructor
 public class AuthenticationServiceImpl implements AuthenticationService {
     private final UserCredentialsRepository userCredentialsRepository;
@@ -75,22 +76,22 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     public TokenResponse refresh(RefreshTokenRequest request) {
         String oldToken = request.refreshToken();
         if (!jwtService.isTokenValid(oldToken, TokenType.REFRESH)) {
-            throw new BadCredentialsException("Invalid refresh token");
+            throw new InvalidTokenException("Invalid refresh token");
         }
         UUID oldTokenId = jwtService.extractTokenId(oldToken);
         Long userId = jwtService.extractUserId(oldToken);
         RefreshTokenEntity storedToken = refreshTokenRepository
                 .findByTokenId(oldTokenId)
-                .orElseThrow(() -> new BadCredentialsException("Invalid refresh token"));
+                .orElseThrow(() -> new InvalidTokenException("Invalid refresh token"));
         if (storedToken.isRevoked()
                 || !storedToken.getUserId().equals(userId)
                 || !storedToken.getExpiresAt().isAfter(LocalDateTime.now())
         ) {
-            throw new BadCredentialsException("Invalid refresh token");
+            throw new InvalidTokenException("Invalid refresh token");
         }
         UserCredentialsEntity credentials = userCredentialsRepository
                 .findByUserId(userId)
-                .orElseThrow(() -> new BadCredentialsException("Invalid refresh token"));
+                .orElseThrow(() -> new InvalidTokenException("Invalid refresh token"));
 
         UUID newTokenId = UUID.randomUUID();
         String accessToken = jwtService.generateAccessToken(
