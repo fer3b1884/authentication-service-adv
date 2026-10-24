@@ -1,10 +1,12 @@
 package by.shved.authenticationserviceadv.controller;
 
 import by.shved.authenticationserviceadv.dto.credentials.LoginRequest;
+import by.shved.authenticationserviceadv.dto.credentials.UserCredentialsRequest;
 import by.shved.authenticationserviceadv.dto.token.RefreshTokenRequest;
 import by.shved.authenticationserviceadv.dto.token.TokenResponse;
 import by.shved.authenticationserviceadv.dto.token.TokenValidationResponse;
 import by.shved.authenticationserviceadv.service.AuthenticationService;
+import by.shved.authenticationserviceadv.service.UserCredentialsService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class AuthenticationController {
     private final AuthenticationService authService;
+    private final UserCredentialsService userCredentialsService;
 
     @PostMapping("/login")
     public ResponseEntity<TokenResponse> login(@Valid @RequestBody LoginRequest request) {
@@ -44,5 +47,13 @@ public class AuthenticationController {
                     .body(response);
         }
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/credentials")
+    public ResponseEntity<Void> saveCredentials(@Valid @RequestBody UserCredentialsRequest request) {
+        userCredentialsService.saveCredentials(request);
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .build();
     }
 }
