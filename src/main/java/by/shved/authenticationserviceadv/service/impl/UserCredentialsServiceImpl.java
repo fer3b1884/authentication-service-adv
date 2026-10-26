@@ -30,7 +30,7 @@ public class UserCredentialsServiceImpl implements UserCredentialsService {
         credentials.setUserId(request.userId());
         credentials.setLogin(request.login());
         credentials.setPasswordHash(passwordEncoder.encode(request.password()));
-        credentials.setRole(UserRole.USER);
+        credentials.setRole(UserRole.ROLE_USER);
         log.info("User credentials created successfully: userId={}", request.userId());
         userCredentialsRepository.save(credentials);
     }
