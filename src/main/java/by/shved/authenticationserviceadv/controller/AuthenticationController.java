@@ -9,7 +9,6 @@ import by.shved.authenticationserviceadv.service.AuthenticationService;
 import by.shved.authenticationserviceadv.service.UserCredentialsService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
