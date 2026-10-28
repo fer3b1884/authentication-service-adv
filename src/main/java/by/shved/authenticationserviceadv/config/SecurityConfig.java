@@ -28,8 +28,8 @@ public class SecurityConfig {
                                 HttpMethod.POST,
                                 "/auth/login",
                                 "/auth/refresh",
-                                "/auth/validate"
-//                                "/auth/credentials"
+                                "/auth/validate",
+                                "/auth/credentials"
                         ).permitAll()
                         .anyRequest().denyAll());
         return http.build();

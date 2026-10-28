@@ -23,7 +23,6 @@ public class UserCredentialsServiceImpl implements UserCredentialsService {
     @Transactional
     public void saveCredentials(UserCredentialsRequest request) {
         if (userCredentialsRepository.existsByLogin(request.login())) {
-            log.warn("Failed to save credentials: login already exists");
             throw new DuplicateResourceException("Login is already taken");
         }
         UserCredentialsEntity credentials = new UserCredentialsEntity();

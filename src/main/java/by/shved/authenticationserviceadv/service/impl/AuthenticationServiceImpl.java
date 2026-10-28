@@ -42,12 +42,8 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     public TokenResponse login(LoginRequest request) {
         UserCredentialsEntity credentials = userCredentialsRepository
                 .findByLogin(request.login())
-                .orElseThrow(() -> {
-                    log.warn("Authentication failed: invalid credentials");
-                    return new BadCredentialsException("Invalid login or password");
-                });
+                .orElseThrow(() -> new BadCredentialsException("Invalid login or password"));
         if (!passwordEncoder.matches(request.password(), credentials.getPasswordHash())) {
-            log.warn("Authentication failed: invalid credentials");
             throw new BadCredentialsException("Invalid login or password");
         }
 
@@ -84,7 +80,6 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     public TokenResponse refresh(RefreshTokenRequest request) {
         String oldToken = request.refreshToken();
         if (!jwtService.isTokenValid(oldToken, TokenType.REFRESH)) {
-            log.warn("Token refresh failed: invalid refresh token");
             throw new InvalidTokenException("Invalid or expired refresh token");
         }
 
@@ -92,23 +87,16 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         Long userId = jwtService.extractUserId(oldToken);
         RefreshTokenEntity storedToken = refreshTokenRepository
                 .findByTokenId(oldTokenId)
-                .orElseThrow(() -> {
-                    log.warn("Token refresh failed: refresh token not found");
-                    return new InvalidTokenException("Invalid or expired refresh token");
-                });
+                .orElseThrow(() -> new InvalidTokenException("Invalid or expired refresh token"));
         if (storedToken.isRevoked()
                 || !storedToken.getUserId().equals(userId)
                 || !storedToken.getExpiresAt().isAfter(LocalDateTime.now())
         ) {
-            log.warn("Token refresh failed: revoked, expired, or user ID mismatch");
             throw new InvalidTokenException("Invalid or expired refresh token");
         }
         UserCredentialsEntity credentials = userCredentialsRepository
                 .findByUserId(userId)
-                .orElseThrow(() -> {
-                    log.warn("Token refresh failed: credentials not found for userId={}", userId);
-                    return new InvalidTokenException("Invalid or expired refresh token");
-                });
+                .orElseThrow(() -> new InvalidTokenException("Invalid or expired refresh token"));
 
         UUID newTokenId = UUID.randomUUID();
         String accessToken = jwtService.generateAccessToken(
