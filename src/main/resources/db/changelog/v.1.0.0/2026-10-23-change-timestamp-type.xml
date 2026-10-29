@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                   https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="2026-10-23-change-timestamp-type" author="shved">
+        <modifyDataType tableName="user_credentials" columnName="created_at" newDataType="timestamp"/>
+        <modifyDataType tableName="user_credentials" columnName="updated_at" newDataType="timestamp"/>
+
+        <modifyDataType tableName="refresh_tokens" columnName="created_at" newDataType="timestamp"/>
+        <modifyDataType tableName="refresh_tokens" columnName="expires_at" newDataType="timestamp"/>
+    </changeSet>
+
+</databaseChangeLog>
