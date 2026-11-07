@@ -26,10 +26,10 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 HttpMethod.POST,
-                                "/auth/login",
-                                "/auth/refresh",
-                                "/auth/validate",
-                                "/auth/credentials"
+                                "/api/v1/auth/login",
+                                "/api/v1/auth/refresh",
+                                "/api/v1/auth/validate",
+                                "/api/v1/auth/credentials"
                         ).permitAll()
                         .anyRequest().denyAll());
         return http.build();

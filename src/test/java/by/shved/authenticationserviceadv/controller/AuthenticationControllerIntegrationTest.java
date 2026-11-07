@@ -76,7 +76,7 @@ class AuthenticationControllerIntegrationTest {
                 }
                 """;
 
-        mockMvc.perform(post("/auth/login")
+        mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(request))
                 .andExpect(status().isOk())
@@ -95,7 +95,7 @@ class AuthenticationControllerIntegrationTest {
                 }
                 """;
 
-        mockMvc.perform(post("/auth/login")
+        mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(request))
                 .andExpect(status().isUnauthorized());
@@ -110,7 +110,7 @@ class AuthenticationControllerIntegrationTest {
                 }
                 """;
 
-        mockMvc.perform(post("/auth/login")
+        mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(request))
                 .andExpect(status().isUnauthorized());
@@ -125,7 +125,7 @@ class AuthenticationControllerIntegrationTest {
                 }
                 """;
 
-        mockMvc.perform(post("/auth/login")
+        mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(request))
                 .andExpect(status().isBadRequest());
@@ -140,7 +140,7 @@ class AuthenticationControllerIntegrationTest {
                 }
                 """;
 
-        mockMvc.perform(post("/auth/login")
+        mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(request))
                 .andExpect(status().isBadRequest());
@@ -151,7 +151,7 @@ class AuthenticationControllerIntegrationTest {
     void validate_whenAccessTokenIsValid_returnsValid() throws Exception {
         String accessToken = obtainAccessToken();
 
-        mockMvc.perform(post("/auth/validate")
+        mockMvc.perform(post("/api/v1/auth/validate")
                         .header("Authorization", "Bearer " + accessToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.valid").value(true))
@@ -161,7 +161,7 @@ class AuthenticationControllerIntegrationTest {
 
     @Test
     void validate_whenTokenIsInvalid_returnsUnauthorized() throws Exception {
-        mockMvc.perform(post("/auth/validate")
+        mockMvc.perform(post("/api/v1/auth/validate")
                         .header("Authorization", "Bearer invalid-token"))
                 .andExpect(status().isUnauthorized());
     }
@@ -175,7 +175,7 @@ class AuthenticationControllerIntegrationTest {
                 }
                 """.formatted(refreshToken);
 
-        mockMvc.perform(post("/auth/refresh")
+        mockMvc.perform(post("/api/v1/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(request))
                 .andExpect(status().isOk())
@@ -193,7 +193,7 @@ class AuthenticationControllerIntegrationTest {
                 }
                 """;
 
-        mockMvc.perform(post("/auth/refresh")
+        mockMvc.perform(post("/api/v1/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(request))
                 .andExpect(status().isUnauthorized());
@@ -207,7 +207,7 @@ class AuthenticationControllerIntegrationTest {
                 }
                 """;
 
-        mockMvc.perform(post("/auth/refresh")
+        mockMvc.perform(post("/api/v1/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(request))
                 .andExpect(status().isBadRequest());
@@ -221,7 +221,7 @@ class AuthenticationControllerIntegrationTest {
                 }
                 """;
 
-        String response = mockMvc.perform(post("/auth/login")
+        String response = mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(request))
                 .andExpect(status().isOk())
@@ -244,7 +244,7 @@ class AuthenticationControllerIntegrationTest {
                 }
                 """;
 
-        String response = mockMvc.perform(post("/auth/login")
+        String response = mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(request))
                 .andExpect(status().isOk())
