@@ -25,12 +25,15 @@ public class UserCredentialsServiceImpl implements UserCredentialsService {
         if (userCredentialsRepository.existsByLogin(request.login())) {
             throw new DuplicateResourceException("Login is already taken");
         }
+        if (userCredentialsRepository.existsByUserId(request.userId())) {
+            throw new DuplicateResourceException("Credentials already exist for this user");
+        }
         UserCredentialsEntity credentials = new UserCredentialsEntity();
         credentials.setUserId(request.userId());
         credentials.setLogin(request.login());
         credentials.setPasswordHash(passwordEncoder.encode(request.password()));
         credentials.setRole(UserRole.ROLE_USER);
-        log.info("User credentials created successfully: userId={}", request.userId());
         userCredentialsRepository.save(credentials);
+        log.info("User credentials created successfully: userId={}", request.userId());
     }
 }

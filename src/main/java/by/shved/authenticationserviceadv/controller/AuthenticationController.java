@@ -12,10 +12,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/auth")
+@RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
 public class AuthenticationController {
     private final AuthenticationService authService;
@@ -27,18 +28,20 @@ public class AuthenticationController {
     }
 
     @PostMapping("/refresh")
+    @PreAuthorize("hasAuthority('INTERNAL_SERVICE')")
     public ResponseEntity<TokenResponse> refresh(@Valid @RequestBody RefreshTokenRequest request) {
         return ResponseEntity.ok(authService.refresh(request));
     }
 
     @PostMapping("/validate")
+    @PreAuthorize("hasAuthority('INTERNAL_SERVICE')")
     public ResponseEntity<TokenValidationResponse> validateToken(@RequestHeader(value = HttpHeaders.AUTHORIZATION) String authorizationHeader) {
         if (!authorizationHeader.startsWith("Bearer ") || authorizationHeader.substring(7).isBlank()) {
             return ResponseEntity
                     .status(HttpStatus.UNAUTHORIZED)
                     .body(new TokenValidationResponse(false, null, null));
         }
-        String token = authorizationHeader.substring(7).trim();
+        String token = authorizationHeader.substring(7).strip();
         TokenValidationResponse response = authService.validateToken(token);
         if (!response.valid()) {
             return ResponseEntity
@@ -49,6 +52,7 @@ public class AuthenticationController {
     }
 
     @PostMapping("/credentials")
+    @PreAuthorize("hasAuthority('INTERNAL_SERVICE')")
     public ResponseEntity<Void> saveCredentials(@Valid @RequestBody UserCredentialsRequest request) {
         userCredentialsService.saveCredentials(request);
         return ResponseEntity

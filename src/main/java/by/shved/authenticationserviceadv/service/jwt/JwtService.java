@@ -1,99 +1,94 @@
 package by.shved.authenticationserviceadv.service.jwt;
 
+import by.shved.authenticationserviceadv.config.property.JwtProperties;
 import by.shved.authenticationserviceadv.entity.TokenType;
 import by.shved.authenticationserviceadv.entity.UserRole;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
+import io.jsonwebtoken.JwtParser;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
 public class JwtService {
-    @Value("${security.jwt.secret}")
-    private String secret;
-    @Value("${security.jwt.access-token-expiration}")
-    private long accessTokenExpiration;
-    @Value("${security.jwt.refresh-token-expiration}")
-    private long refreshTokenExpiration;
+    private static final String CLAIM_ROLE = "role";
+    private static final String CLAIM_TOKEN_TYPE = "tokenType";
 
-    public String generateAccessToken(Long userId, UserRole role) {
-        return generateToken(userId, role, TokenType.ACCESS, accessTokenExpiration, null);
+    private final SecretKey signingKey;
+    private final Duration accessTokenExpiration;
+    private final Duration refreshTokenExpiration;
+    private final JwtParser jwtParser;
+
+    public JwtService(JwtProperties jwtProperties){
+        this.signingKey = Keys.hmacShaKeyFor(Decoders.BASE64.decode(jwtProperties.secret()));
+        this.accessTokenExpiration = jwtProperties.accessTokenExpiration();
+        this.refreshTokenExpiration = jwtProperties.refreshTokenExpiration();
+        this.jwtParser = Jwts.parser()
+                .verifyWith(signingKey)
+                .build();
+    }
+
+    public String generateAccessToken(Long userId, UserRole role, UUID tokenId) {
+        return generateToken(userId, role, TokenType.ACCESS, accessTokenExpiration, tokenId);
     }
 
     public String generateRefreshToken(Long userId, UserRole role, UUID tokenId) {
         return generateToken(userId, role, TokenType.REFRESH, refreshTokenExpiration, tokenId);
     }
 
-    private String generateToken(Long userId, UserRole role, TokenType tokenType,
-                                 long expiration, UUID tokenId) {
+    private String generateToken(Long userId, UserRole role, TokenType tokenType, Duration expiration, UUID tokenId) {
         Instant now = Instant.now();
-        Instant expiresAt = now.plusMillis(expiration);
-        var builder = Jwts.builder()
+        Instant expiresAt = now.plus(expiration);
+        return Jwts.builder()
+                .id(tokenId.toString())
                 .subject(userId.toString())
-                .claim("userId", userId)
-                .claim("role", role.name())
-                .claim("tokenType", tokenType.name())
+                .claim(CLAIM_ROLE, role.name())
+                .claim(CLAIM_TOKEN_TYPE, tokenType.name())
                 .issuedAt(Date.from(now))
-                .expiration(Date.from(expiresAt));
-        if (tokenId != null) {
-            builder.id(tokenId.toString());
-        }
-        return builder
-                .signWith(getSigningKey())
+                .expiration(Date.from(expiresAt))
+                .signWith(signingKey)
                 .compact();
     }
 
-    public boolean isTokenValid(String token, TokenType expectedTokenType) {
+    public Optional<JwtPayload> parseAndValidate(String token, TokenType expectedTokenType) {
+        if (token == null || token.isBlank() || expectedTokenType == null) {
+            return Optional.empty();
+        }
         try {
             Claims claims = parseClaims(token);
-            Long userId = Long.valueOf(claims.getSubject());
-            UserRole.valueOf(claims.get("role", String.class));
-            TokenType tokenType = TokenType.valueOf(claims.get("tokenType", String.class));
+            String subject = claims.getSubject();
+            String idStr = claims.getId();
+            String roleStr = claims.get(CLAIM_ROLE, String.class);
+            String typeStr = claims.get(CLAIM_TOKEN_TYPE, String.class);
+            Date expiration = claims.getExpiration();
+            if (subject == null || idStr == null || roleStr == null || typeStr == null || expiration == null) {
+                return Optional.empty();
+            }
+            Long userId = Long.valueOf(subject);
+            UUID tokenId = UUID.fromString(idStr);
+            UserRole role = UserRole.valueOf(roleStr);
+            TokenType tokenType = TokenType.valueOf(typeStr);
             if (userId <= 0 || tokenType != expectedTokenType) {
-                return false;
+                return Optional.empty();
             }
-            if (expectedTokenType == TokenType.REFRESH) {
-                UUID.fromString(claims.getId());
-            }
-            return true;
-        } catch (JwtException | IllegalArgumentException | NullPointerException exception) {
-            return false;
+            return Optional.of(new JwtPayload(userId, role, tokenType, tokenId, expiration.toInstant()));
+        } catch (JwtException | IllegalArgumentException exception) {
+            return Optional.empty();
         }
     }
 
-    public Long extractUserId(String token) {
-        return Long.valueOf(parseClaims(token).getSubject());
-    }
-
-    public UserRole extractRole(String token) {
-        return UserRole.valueOf(parseClaims(token).get("role", String.class));
-    }
-
-    public TokenType extractTokenType(String token) {
-        return TokenType.valueOf(parseClaims(token).get("tokenType", String.class));
-    }
-
-    public UUID extractTokenId(String token) {
-        return UUID.fromString(parseClaims(token).getId());
-    }
-
     private Claims parseClaims(String token) {
-        return Jwts.parser()
-                .verifyWith(getSigningKey())
-                .build()
+        return jwtParser
                 .parseSignedClaims(token)
                 .getPayload();
-    }
-
-    private SecretKey getSigningKey() {
-        return Keys.hmacShaKeyFor(Decoders.BASE64.decode(secret));
     }
 }
