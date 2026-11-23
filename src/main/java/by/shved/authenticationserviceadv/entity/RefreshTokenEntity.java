@@ -1,6 +1,7 @@
 package by.shved.authenticationserviceadv.entity;
 
 import jakarta.persistence.*;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -10,10 +11,10 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
-@NoArgsConstructor
 @Getter
 @Setter
 @Entity
+@NoArgsConstructor
 @Table(name = "refresh_tokens")
 @EntityListeners(AuditingEntityListener.class)
 public class RefreshTokenEntity {

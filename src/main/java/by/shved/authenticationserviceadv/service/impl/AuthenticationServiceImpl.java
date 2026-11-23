@@ -1,5 +1,6 @@
 package by.shved.authenticationserviceadv.service.impl;
 
+import by.shved.authenticationserviceadv.config.property.JwtProperties;
 import by.shved.authenticationserviceadv.dto.credentials.LoginRequest;
 import by.shved.authenticationserviceadv.dto.token.RefreshTokenRequest;
 import by.shved.authenticationserviceadv.dto.token.TokenResponse;
@@ -11,14 +12,16 @@ import by.shved.authenticationserviceadv.exception.InvalidTokenException;
 import by.shved.authenticationserviceadv.repository.RefreshTokenRepository;
 import by.shved.authenticationserviceadv.repository.UserCredentialsRepository;
 import by.shved.authenticationserviceadv.service.AuthenticationService;
+import by.shved.authenticationserviceadv.service.jwt.JwtPayload;
 import by.shved.authenticationserviceadv.service.jwt.JwtService;
-import jakarta.transaction.Transactional;
+import by.shved.authenticationserviceadv.service.token.RefreshTokenRevocationService;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -29,13 +32,10 @@ import java.util.UUID;
 public class AuthenticationServiceImpl implements AuthenticationService {
     private final UserCredentialsRepository userCredentialsRepository;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final RefreshTokenRevocationService refreshTokenRevocationService;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
-
-    @Value("${security.jwt.refresh-token-expiration}")
-    private long refreshTokenExpiration;
-    @Value("${security.jwt.access-token-expiration}")
-    private long accessTokenExpiration;
+    private final JwtProperties jwtProperties;
 
     @Override
     @Transactional
@@ -50,7 +50,8 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         UUID tokenId = UUID.randomUUID();
         String accessToken = jwtService.generateAccessToken(
                 credentials.getUserId(),
-                credentials.getRole()
+                credentials.getRole(),
+                UUID.randomUUID()
         );
         String refreshToken = jwtService.generateRefreshToken(
                 credentials.getUserId(),
@@ -58,40 +59,38 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 tokenId
         );
 
-        RefreshTokenEntity refreshTokenEntity = new RefreshTokenEntity();
-        refreshTokenEntity.setUserId(credentials.getUserId());
-        refreshTokenEntity.setTokenId(tokenId);
-        refreshTokenEntity.setRevoked(false);
-        refreshTokenEntity.setExpiresAt(LocalDateTime.now().plusSeconds(refreshTokenExpiration / 1000));
-        refreshTokenRepository.save(refreshTokenEntity);
-
+        refreshTokenRepository.save(createRefreshToken(
+                credentials.getUserId(),
+                tokenId
+        ));
         log.info("User authenticated successfully: userId={}, role={}",
                 credentials.getUserId(), credentials.getRole());
         return new TokenResponse(
                 accessToken,
                 refreshToken,
                 "Bearer",
-                accessTokenExpiration / 1000
+                jwtProperties.accessTokenExpiration().toSeconds()
         );
     }
 
     @Override
     @Transactional
     public TokenResponse refresh(RefreshTokenRequest request) {
-        String oldToken = request.refreshToken();
-        if (!jwtService.isTokenValid(oldToken, TokenType.REFRESH)) {
-            throw new InvalidTokenException("Invalid or expired refresh token");
-        }
-
-        UUID oldTokenId = jwtService.extractTokenId(oldToken);
-        Long userId = jwtService.extractUserId(oldToken);
-        RefreshTokenEntity storedToken = refreshTokenRepository
-                .findByTokenId(oldTokenId)
+        JwtPayload payload = jwtService
+                .parseAndValidate(request.refreshToken(), TokenType.REFRESH)
                 .orElseThrow(() -> new InvalidTokenException("Invalid or expired refresh token"));
-        if (storedToken.isRevoked()
-                || !storedToken.getUserId().equals(userId)
-                || !storedToken.getExpiresAt().isAfter(LocalDateTime.now())
-        ) {
+        UUID oldTokenId = payload.tokenId();
+        Long userId = payload.userId();
+        LocalDateTime now = LocalDateTime.now();
+        int revokedCount = refreshTokenRepository.revokeIfValid(
+                oldTokenId,
+                userId,
+                now
+        );
+        if (revokedCount != 1) {
+            refreshTokenRepository.findByTokenId(oldTokenId)
+                    .filter(RefreshTokenEntity::isRevoked)
+                    .ifPresent(token -> refreshTokenRevocationService.revokeAllUserTokens(userId));
             throw new InvalidTokenException("Invalid or expired refresh token");
         }
         UserCredentialsEntity credentials = userCredentialsRepository
@@ -101,41 +100,50 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         UUID newTokenId = UUID.randomUUID();
         String accessToken = jwtService.generateAccessToken(
                 credentials.getUserId(),
-                credentials.getRole()
+                credentials.getRole(),
+                UUID.randomUUID()
         );
         String refreshToken = jwtService.generateRefreshToken(
                 credentials.getUserId(),
                 credentials.getRole(),
                 newTokenId
         );
-        storedToken.setRevoked(true);
-        refreshTokenRepository.save(storedToken);
 
-        RefreshTokenEntity newStoredToken = new RefreshTokenEntity();
-        newStoredToken.setUserId(credentials.getUserId());
-        newStoredToken.setTokenId(newTokenId);
-        newStoredToken.setRevoked(false);
-        newStoredToken.setExpiresAt(LocalDateTime.now().plusSeconds(refreshTokenExpiration / 1000));
-        refreshTokenRepository.save(newStoredToken);
-
+        refreshTokenRepository.save(createRefreshToken(
+                credentials.getUserId(),
+                newTokenId
+        ));
         log.info("Tokens refreshed successfully: userId={}", userId);
         return new TokenResponse(
                 accessToken,
                 refreshToken,
                 "Bearer",
-                accessTokenExpiration / 1000
+                jwtProperties.accessTokenExpiration().toSeconds()
         );
     }
 
     @Override
     public TokenValidationResponse validateToken(String token) {
-        if (!jwtService.isTokenValid(token, TokenType.ACCESS)) {
+        JwtPayload payload = jwtService
+                .parseAndValidate(token, TokenType.ACCESS)
+                .orElse(null);
+
+        if (payload == null) {
             log.debug("Access token validation failed");
             return new TokenValidationResponse(false, null, null);
         }
-        Long userId = jwtService.extractUserId(token);
-        String role = jwtService.extractRole(token).name();
+        Long userId = payload.userId();
+        String role = payload.role().name();
         log.info("Access token validated successfully: userId={}, role={}", userId, role);
         return new TokenValidationResponse(true, userId, role);
+    }
+
+    private RefreshTokenEntity createRefreshToken(Long userId, UUID tokenId) {
+        RefreshTokenEntity refreshToken = new RefreshTokenEntity();
+        refreshToken.setUserId(userId);
+        refreshToken.setTokenId(tokenId);
+        refreshToken.setRevoked(false);
+        refreshToken.setExpiresAt(LocalDateTime.now().plus(jwtProperties.refreshTokenExpiration()));
+        return refreshToken;
     }
 }

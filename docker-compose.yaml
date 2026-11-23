@@ -3,13 +3,24 @@ services:
     build: .
     container_name: auth-service-app
     ports:
-      - "8082:8080"
+      - "${DOCKER_HOST_PORT:-8081}:${SERVER_PORT:-8081}"
     environment:
       SPRING_PROFILES_ACTIVE: docker
+      SERVER_PORT: ${SERVER_PORT:-8081}
+
       DOCKER_DB_URL: ${DOCKER_DB_URL}
       DOCKER_DB_USERNAME: ${DOCKER_DB_USERNAME}
       DOCKER_DB_PASSWORD: ${DOCKER_DB_PASSWORD}
+
       DOCKER_JWT_SECRET: ${DOCKER_JWT_SECRET}
+      DOCKER_INTERNAL_SERVICE_SECRET: ${DOCKER_INTERNAL_SERVICE_SECRET}
+
+      JWT_ACCESS_EXPIRATION: ${JWT_ACCESS_EXPIRATION}
+      JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION}
+
+      ADMIN_USER_ID: ${ADMIN_USER_ID}
+      ADMIN_LOGIN: ${ADMIN_LOGIN}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
     depends_on:
       postgres:
         condition: service_healthy
@@ -18,7 +29,7 @@ services:
     image: postgres:16-alpine
     container_name: auth-service-postgres
     environment:
-      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_DB: ${DOCKER_DB_NAME}
       POSTGRES_USER: ${DOCKER_DB_USERNAME}
       POSTGRES_PASSWORD: ${DOCKER_DB_PASSWORD}
     volumes:

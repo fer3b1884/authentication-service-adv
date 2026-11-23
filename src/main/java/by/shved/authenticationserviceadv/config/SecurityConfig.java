@@ -1,20 +1,37 @@
 package by.shved.authenticationserviceadv.config;
 
+import by.shved.authenticationserviceadv.security.InternalAuthenticationFilter;
+import by.shved.authenticationserviceadv.security.RestSecurityExceptionHandler;
+import lombok.RequiredArgsConstructor;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
+@EnableMethodSecurity
+@RequiredArgsConstructor
 public class SecurityConfig {
+    private final RestSecurityExceptionHandler securityExceptionHandler;
+    private final InternalAuthenticationFilter internalAuthenticationFilter;
+
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    public FilterRegistrationBean<InternalAuthenticationFilter> internalFilterRegistration(InternalAuthenticationFilter internalAuthenticationFilter) {
+        FilterRegistrationBean<InternalAuthenticationFilter> registration = new FilterRegistrationBean<>(internalAuthenticationFilter);
+        registration.setEnabled(false);
+        return registration;
     }
 
     @Bean
@@ -22,16 +39,16 @@ public class SecurityConfig {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                )
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(
-                                HttpMethod.POST,
-                                "/api/v1/auth/login",
-                                "/api/v1/auth/refresh",
-                                "/api/v1/auth/validate",
-                                "/api/v1/auth/credentials"
-                        ).permitAll()
-                        .anyRequest().denyAll());
+                        .anyRequest().authenticated()
+                )
+                .exceptionHandling(exceptions -> exceptions
+                        .authenticationEntryPoint(securityExceptionHandler)
+                        .accessDeniedHandler(securityExceptionHandler)
+                )
+                .addFilterBefore(internalAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
 }
