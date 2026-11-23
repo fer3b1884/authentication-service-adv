@@ -1,0 +1,20 @@
+FROM maven:3.9-eclipse-temurin-25 AS build
+
+WORKDIR /app
+
+COPY pom.xml .
+COPY src/ src/
+
+RUN mvn -B clean package -DskipTests
+
+FROM eclipse-temurin:25-jre
+
+# non-privileged user
+RUN adduser --system spring-boot && addgroup --system spring-boot && adduser spring-boot spring-boot
+USER spring-boot
+
+WORKDIR /app
+
+COPY --from=build /app/target/authentication-service-adv-0.0.1-SNAPSHOT.jar /app/application.jar
+
+ENTRYPOINT ["java", "-jar", "./application.jar"]
